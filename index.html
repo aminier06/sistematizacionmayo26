@@ -148,6 +148,41 @@ body::before {
   padding-right:30px; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
 }
 .fgrp select:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(11,95,165,.13); }
+.fgrp-centro { position: relative; }
+.centro-search-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.centro-search-wrap input[type="text"] {
+  font-size:13px; padding:9px 30px 9px 11px; border-radius:10px;
+  border:1px solid var(--border-strong); background-color:#fbfdff; color:var(--text);
+  width:100%; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+  outline: none; font-family: inherit;
+}
+.centro-search-wrap input[type="text"]:focus {
+  border-color:var(--blue); box-shadow:0 0 0 3px rgba(11,95,165,.13);
+}
+.centro-clear {
+  position: absolute; right: 9px; font-size: 12px; color: var(--text3);
+  cursor: pointer; line-height: 1; display: none; user-select: none;
+}
+.centro-clear:hover { color: var(--red); }
+.centro-drop {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: #fff; border: 1px solid var(--border-strong);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(15,55,92,.13);
+  max-height: 220px; overflow-y: auto; z-index: 100; display: none;
+}
+.centro-drop.open { display: block; }
+.centro-opt {
+  padding: 8px 12px; font-size: 12px; cursor: pointer;
+  color: var(--text); border-bottom: 1px solid rgba(15,55,92,.07);
+  line-height: 1.4;
+}
+.centro-opt:last-child { border-bottom: none; }
+.centro-opt:hover, .centro-opt.active { background: var(--blue-bg); color: var(--blue-dark); }
+.centro-opt mark { background: none; color: var(--blue); font-weight: 700; }
+.centro-opt .opt-code { font-size: 10.5px; color: var(--text3); margin-left: 5px; }
+.centro-no-results { padding: 10px 12px; font-size: 12px; color: var(--text3); }
 .sector-note {
   font-size:11.5px; color:var(--text2); margin-top:12px;
   display:flex; align-items:center; gap:6px; padding:9px 10px;
@@ -315,7 +350,17 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
     <div class="filter-row">
       <div class="fgrp"><label>Regional</label><select id="fR" onchange="cascadeR()"><option value="">Todas</option></select></div>
       <div class="fgrp"><label>Distrito educativo</label><select id="fD" onchange="cascadeD()"><option value="">Todos</option></select></div>
-      <div class="fgrp"><label>Centro educativo</label><select id="fC" onchange="renderAll()"><option value="">Todos</option></select></div>
+      <div class="fgrp fgrp-centro">
+        <label>Centro educativo</label>
+        <div class="centro-search-wrap">
+          <input id="fC-input" type="text" placeholder="Nombre o código…" autocomplete="off"
+            oninput="onCentroInput()" onfocus="showCentroDrop()" onblur="hideCentroDrop()"
+            onkeydown="onCentroKey(event)">
+          <span class="centro-clear" id="fC-clear" onclick="clearCentro()" title="Limpiar">✕</span>
+        </div>
+        <div class="centro-drop" id="fC-drop"></div>
+        <input type="hidden" id="fC">
+      </div>
       <div class="fgrp"><label>Sector</label>
         <select id="fSec" onchange="cascadeR()">
           <option value="">Público y semioficial</option>
@@ -5669,13 +5714,18 @@ function cascadeC() {
   const dist = document.getElementById('fD').value;
   const fSec = norm(document.getElementById('fSec').value || '');
 
-  // Centros from CATALOGO (always complete and clean)
+  // Build the pool of centros for the current regional/distrito/sector
   let catBase = CATALOGO.filter(c => !fSec || norm(c.sector) === fSec);
   if (reg)  catBase = catBase.filter(c => c.regional === reg);
   if (dist) catBase = catBase.filter(c => c.distrito === dist);
-  popSelect('fC', uniq(catBase.map(c => c.nombre)), 'Todos');
+  // Store as global for the autocomplete to use
+  window._centroPool = catBase;
 
-  // Tandas from ALL (only rows that match current filters)
+  // If a centro is selected but no longer in pool, clear it
+  const selCod = document.getElementById('fC').value;
+  if (selCod && !catBase.some(c => c.codigo === selCod)) clearCentro(false);
+
+  // Tandas from ALL
   let allBase = ALL.filter(esSectorOK);
   if (reg)  allBase = allBase.filter(r => r['REGIONAL'] === reg);
   if (dist) allBase = allBase.filter(r => r['DISTRITO EDUCATIVO'] === dist);
@@ -5689,24 +5739,21 @@ function cascadeC() {
 }
 
 function fr() {
-  const reg  = document.getElementById('fR').value;
-  const dist = document.getElementById('fD').value;
-  const ctr  = document.getElementById('fC').value;  // nombre from CATALOGO
-  const tan  = document.getElementById('fT').value;
+  const reg     = document.getElementById('fR').value;
+  const dist    = document.getElementById('fD').value;
+  const ctrCod  = document.getElementById('fC').value;  // codigo from CATALOGO
+  const tan     = document.getElementById('fT').value;
 
-  // If a centro is selected, find its codigo(s) from CATALOGO
-  let codigosFiltro = null;
-  if (ctr) {
-    const matches = CATALOGO.filter(c => c.nombre === ctr);
-    codigosFiltro = new Set(matches.map(c => normCod(c.codigo)));
-  }
+  const codigosFiltro = ctrCod
+    ? new Set([normCod(ctrCod)])
+    : null;
 
   return ALL.filter(r => {
     if (!esSectorOK(r)) return false;
-    if (reg  && r['REGIONAL'] !== reg)                   return false;
-    if (dist && r['DISTRITO EDUCATIVO'] !== dist)        return false;
+    if (reg  && r['REGIONAL'] !== reg)            return false;
+    if (dist && r['DISTRITO EDUCATIVO'] !== dist) return false;
     if (codigosFiltro && !codigosFiltro.has(normCod(r['Código SIGERD']))) return false;
-    if (tan  && r['TANDA'] !== tan)                      return false;
+    if (tan  && r['TANDA'] !== tan)               return false;
     return true;
   });
 }
@@ -5975,6 +6022,125 @@ function renderAll() {
 }
 
 // ── loadAll con Promise.allSettled ────────────────────────────────────────────
+// ── Centro autocomplete ──────────────────────────────────────────────────
+window._centroPool = [];
+let _centroActiveIdx = -1;
+
+function _centroMatches(query) {
+  if (!query) return [];
+  const q = norm(query);
+  const results = [];
+  for (const c of window._centroPool) {
+    const nNombre  = norm(c.nombre);
+    const nCodigo  = norm(c.codigo);
+    const inNombre = nNombre.includes(q);
+    const inCodigo = nCodigo.includes(q);
+    if (inNombre || inCodigo) results.push({ c, inNombre, inCodigo });
+    if (results.length >= 80) break;
+  }
+  return results;
+}
+
+function _highlight(text, query) {
+  if (!query) return text;
+  const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`(${q})`, 'gi'), '<mark>$1</mark>');
+}
+
+function onCentroInput() {
+  const q = document.getElementById('fC-input').value.trim();
+  const clr = document.getElementById('fC-clear');
+  clr.style.display = q ? 'block' : 'none';
+
+  // If input was cleared or changed, clear the hidden value
+  const selCod = document.getElementById('fC').value;
+  if (selCod) {
+    const selEntry = window._centroPool.find(c => c.codigo === selCod);
+    if (!selEntry || selEntry.nombre !== q) {
+      document.getElementById('fC').value = '';
+      renderAll();
+    }
+  }
+  renderCentroDrop(q);
+}
+
+function renderCentroDrop(q) {
+  const drop = document.getElementById('fC-drop');
+  _centroActiveIdx = -1;
+  if (!q) { drop.classList.remove('open'); drop.innerHTML = ''; return; }
+
+  const matches = _centroMatches(q);
+  if (!matches.length) {
+    drop.innerHTML = '<div class="centro-no-results">Sin resultados</div>';
+    drop.classList.add('open');
+    return;
+  }
+  drop.innerHTML = matches.map(({ c }, i) => {
+    const cod  = c.codigo;
+    const name = _highlight(c.nombre.replace(/^\d+ - /, ''), q);
+    const codH = _highlight(cod, q);
+    return `<div class="centro-opt" data-codigo="${cod}" data-nombre="${c.nombre.replace(/"/g,'&quot;')}"
+      onmousedown="selectCentro('${cod}','${c.nombre.replace(/'/g,"\\'")}')">
+      ${name}<span class="opt-code">${codH}</span>
+    </div>`;
+  }).join('');
+  drop.classList.add('open');
+}
+
+function selectCentro(codigo, nombre) {
+  document.getElementById('fC-input').value = nombre;
+  document.getElementById('fC').value = codigo;
+  document.getElementById('fC-clear').style.display = 'block';
+  document.getElementById('fC-drop').classList.remove('open');
+  _centroActiveIdx = -1;
+  renderAll();
+}
+
+function clearCentro(doRender = true) {
+  document.getElementById('fC-input').value = '';
+  document.getElementById('fC').value = '';
+  document.getElementById('fC-clear').style.display = 'none';
+  document.getElementById('fC-drop').classList.remove('open');
+  _centroActiveIdx = -1;
+  if (doRender) renderAll();
+}
+
+function showCentroDrop() {
+  const q = document.getElementById('fC-input').value.trim();
+  if (q) renderCentroDrop(q);
+}
+
+function hideCentroDrop() {
+  setTimeout(() => {
+    document.getElementById('fC-drop').classList.remove('open');
+  }, 150);
+}
+
+function onCentroKey(e) {
+  const drop = document.getElementById('fC-drop');
+  const opts = drop.querySelectorAll('.centro-opt');
+  if (!opts.length) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _centroActiveIdx = Math.min(_centroActiveIdx + 1, opts.length - 1);
+    opts.forEach((o, i) => o.classList.toggle('active', i === _centroActiveIdx));
+    opts[_centroActiveIdx]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _centroActiveIdx = Math.max(_centroActiveIdx - 1, 0);
+    opts.forEach((o, i) => o.classList.toggle('active', i === _centroActiveIdx));
+    opts[_centroActiveIdx]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (_centroActiveIdx >= 0 && opts[_centroActiveIdx]) {
+      const o = opts[_centroActiveIdx];
+      selectCentro(o.dataset.codigo, o.dataset.nombre);
+    }
+  } else if (e.key === 'Escape') {
+    clearCentro();
+  }
+}
+
 async function loadAll() {
   document.getElementById('msg').style.display = 'block';
   document.getElementById('dc').style.display  = 'none';
