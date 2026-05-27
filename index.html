@@ -5648,47 +5648,67 @@ function popSelect(id, vals, ph) {
 }
 
 function cascadeR() {
-  const base = ALL.filter(esSectorOK);
-  popSelect('fR', uniq(base.map(r => r['REGIONAL'])), 'Todas');
+  const fSec = norm(document.getElementById('fSec').value || '');
+  const base = CATALOGO.filter(c => !fSec || norm(c.sector) === fSec);
+  popSelect('fR', uniq(base.map(c => c.regional)), 'Todas');
   document.getElementById('fD').innerHTML = '<option value="">Todos</option>';
   document.getElementById('fC').innerHTML = '<option value="">Todos</option>';
   cascadeD();
 }
 function cascadeD() {
-  const reg = document.getElementById('fR').value;
-  let base = ALL.filter(esSectorOK);
-  if (reg) base = base.filter(r => r['REGIONAL'] === reg);
-  popSelect('fD', uniq(base.map(r => r['DISTRITO EDUCATIVO'])), 'Todos');
+  const reg  = document.getElementById('fR').value;
+  const fSec = norm(document.getElementById('fSec').value || '');
+  let base = CATALOGO.filter(c => !fSec || norm(c.sector) === fSec);
+  if (reg) base = base.filter(c => c.regional === reg);
+  popSelect('fD', uniq(base.map(c => c.distrito)), 'Todos');
   document.getElementById('fC').innerHTML = '<option value="">Todos</option>';
   cascadeC();
 }
 function cascadeC() {
-  const reg = document.getElementById('fR').value, dist = document.getElementById('fD').value;
-  let base = ALL.filter(esSectorOK);
-  if (reg)  base = base.filter(r => r['REGIONAL'] === reg);
-  if (dist) base = base.filter(r => r['DISTRITO EDUCATIVO'] === dist);
-  popSelect('fC', uniq(base.map(r => r['CENTRO EDUCATIVO'])), 'Todos');
-  // Only show Tanda values that look like actual tandas (not empty, not numeric codes, not IDs)
-  const tandas = uniq(base
+  const reg  = document.getElementById('fR').value;
+  const dist = document.getElementById('fD').value;
+  const fSec = norm(document.getElementById('fSec').value || '');
+
+  // Centros from CATALOGO (always complete and clean)
+  let catBase = CATALOGO.filter(c => !fSec || norm(c.sector) === fSec);
+  if (reg)  catBase = catBase.filter(c => c.regional === reg);
+  if (dist) catBase = catBase.filter(c => c.distrito === dist);
+  popSelect('fC', uniq(catBase.map(c => c.nombre)), 'Todos');
+
+  // Tandas from ALL (only rows that match current filters)
+  let allBase = ALL.filter(esSectorOK);
+  if (reg)  allBase = allBase.filter(r => r['REGIONAL'] === reg);
+  if (dist) allBase = allBase.filter(r => r['DISTRITO EDUCATIVO'] === dist);
+  const tandas = uniq(allBase
     .map(r => (r['TANDA'] || '').trim())
     .filter(t => t.length > 1 && t.length < 30 && !/^\d+$/.test(t))
   );
   popSelect('fT', tandas, 'Todas');
+
   renderAll();
 }
 
 function fr() {
   const reg  = document.getElementById('fR').value;
   const dist = document.getElementById('fD').value;
-  const ctr  = document.getElementById('fC').value;
+  const ctr  = document.getElementById('fC').value;  // nombre from CATALOGO
   const tan  = document.getElementById('fT').value;
-  return ALL.filter(r =>
-    esSectorOK(r) &&
-    (!reg  || r['REGIONAL'] === reg) &&
-    (!dist || r['DISTRITO EDUCATIVO'] === dist) &&
-    (!ctr  || r['CENTRO EDUCATIVO'] === ctr) &&
-    (!tan  || r['TANDA'] === tan)
-  );
+
+  // If a centro is selected, find its codigo(s) from CATALOGO
+  let codigosFiltro = null;
+  if (ctr) {
+    const matches = CATALOGO.filter(c => c.nombre === ctr);
+    codigosFiltro = new Set(matches.map(c => normCod(c.codigo)));
+  }
+
+  return ALL.filter(r => {
+    if (!esSectorOK(r)) return false;
+    if (reg  && r['REGIONAL'] !== reg)                   return false;
+    if (dist && r['DISTRITO EDUCATIVO'] !== dist)        return false;
+    if (codigosFiltro && !codigosFiltro.has(normCod(r['Código SIGERD']))) return false;
+    if (tan  && r['TANDA'] !== tan)                      return false;
+    return true;
+  });
 }
 
 function catFiltrado() {
