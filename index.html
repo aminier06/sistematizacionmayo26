@@ -5558,12 +5558,27 @@ async function tryFetch(id, validator) {
       clearTimeout(to);
       if (r.ok) {
         const txt = await r.text();
-        if (validator(txt)) {
-          setStatus('');
-          return Papa.parse(txt.trim(), { header: true, skipEmptyLines: true }).data;
+        console.log(`[tryFetch] proxy ${i} ok, bytes=${txt.length}, first200=`, txt.slice(0,200));
+        if (txt.length < 50) { console.warn('[tryFetch] response too short, skipping'); continue; }
+        const parsed = Papa.parse(txt.trim(), { header: true, skipEmptyLines: true });
+        const headers = parsed.meta.fields || [];
+        console.log('[tryFetch] headers:', headers);
+        if (!validator(txt)) {
+          console.warn('[tryFetch] validator rejected, headers were:', headers);
+          // For the second attempt onward, accept any non-empty parse that has some columns
+          if (i > 0 && parsed.data.length > 0 && headers.length > 2) {
+            console.warn('[tryFetch] accepting anyway due to non-empty data');
+            setStatus('');
+            return parsed.data;
+          }
+          continue;
         }
+        setStatus('');
+        return parsed.data;
+      } else {
+        console.warn(`[tryFetch] proxy ${i} HTTP ${r.status}`);
       }
-    } catch(e) { continue; }
+    } catch(e) { console.warn(`[tryFetch] proxy ${i} error:`, e.message); continue; }
   }
   throw new Error('No se pudo conectar con la hoja ' + id);
 }
@@ -5572,30 +5587,38 @@ async function tryFetch(id, validator) {
 async function fetchEval(id) {
   const rows = await tryFetch(
     id,
-    t => t.includes('SIGERD') || t.includes('Código') || t.includes('Codigo') || t.includes('CODIGO')
+    t => t.length > 50  // accept any non-trivial response; column check happens inside
   );
 
-  return rows
-    .map(r => {
-      const out = {};
-      for (const [k, v] of Object.entries(r)) {
-        const kn = k.trim()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/\s+/g, ' ')
-          .toUpperCase();
+  console.log(`[fetchEval] id=${id.slice(-20)} rawRows=${rows.length}`);
+  if (rows.length > 0) console.log('[fetchEval] raw columns:', Object.keys(rows[0]));
 
-        if      (kn.includes('SIGERD'))                          out['Código SIGERD']      = (v || '').trim();
-        else if (kn === 'REGIONAL')                              out['REGIONAL']            = (v || '').trim();
-        else if (kn.includes('DISTRITO'))                        out['DISTRITO EDUCATIVO']  = (v || '').trim();
-        else if (kn.includes('CENTRO') || kn.includes('NOMBRE')) out['CENTRO EDUCATIVO']   = (v || '').trim();
-        else if (kn === 'SECTOR')                                out['SECTOR']              = (v || '').trim();
-        else if (kn === 'TANDA')                                 out['TANDA']               = (v || '').trim();
-        else                                                     out[k] = v;
-      }
-      return out;
-    })
-    .filter(r => r['Código SIGERD'] && r['Código SIGERD'].trim());
+  const mapped = rows.map(r => {
+    const out = {};
+    for (const [k, v] of Object.entries(r)) {
+      const kn = k.trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+
+      if      (kn.includes('SIGERD'))                           out['Código SIGERD']     = (v || '').trim();
+      else if (kn === 'REGIONAL')                               out['REGIONAL']           = (v || '').trim();
+      else if (kn.includes('DISTRITO'))                         out['DISTRITO EDUCATIVO'] = (v || '').trim();
+      else if (kn.includes('CENTRO') || kn.includes('NOMBRE')) out['CENTRO EDUCATIVO']   = (v || '').trim();
+      else if (kn === 'SECTOR')                                 out['SECTOR']             = (v || '').trim();
+      else if (kn === 'TANDA')                                  out['TANDA']              = (v || '').trim();
+      else                                                      out[k] = v;
+    }
+    return out;
+  });
+
+  const filtered = mapped.filter(r => r['Código SIGERD'] && r['Código SIGERD'].trim());
+  console.log(`[fetchEval] after filter: ${filtered.length} rows with Código SIGERD`);
+  if (filtered.length === 0 && mapped.length > 0) {
+    console.error('[fetchEval] WARNING: all rows filtered out. Mapped keys sample:', Object.keys(mapped[0]));
+  }
+  return filtered;
 }
 
 function num(r, k) { return parseInt(r[k] || 0) || 0; }
@@ -5645,7 +5668,12 @@ function cascadeC() {
   if (reg)  base = base.filter(r => r['REGIONAL'] === reg);
   if (dist) base = base.filter(r => r['DISTRITO EDUCATIVO'] === dist);
   popSelect('fC', uniq(base.map(r => r['CENTRO EDUCATIVO'])), 'Todos');
-  popSelect('fT', uniq(base.map(r => r['TANDA'])), 'Todas');
+  // Only show Tanda values that look like actual tandas (not empty, not numeric codes, not IDs)
+  const tandas = uniq(base
+    .map(r => (r['TANDA'] || '').trim())
+    .filter(t => t.length > 1 && t.length < 30 && !/^\d+$/.test(t))
+  );
+  popSelect('fT', tandas, 'Todas');
   renderAll();
 }
 
@@ -5990,7 +6018,7 @@ async function loadAll() {
     ? ` · <span style="color:#EF9F27;font-size:11px">⚠ ${warnings.join('; ')}</span>`
     : '';
   document.getElementById('upd').innerHTML =
-    `${t} · ${ALL.filter(esSectorOK).length} registros · ${CATALOGO.length} centros en catálogo${warnHtml}`;
+    `${t} · PC: ${pc.length} registros · SC: ${sc.length} registros · ${ALL.filter(esSectorOK).length} total${warnHtml}`;
 
   cascadeR();
 }
