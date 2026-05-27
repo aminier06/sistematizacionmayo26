@@ -340,7 +340,7 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
     </div>
     <div>
       <h1>SIREV Primaria</h1>
-      <p>Mayo 2026 · Evaluación de Seguimiento Final · Actualización automática cada 2 min</p>
+      <p>Monitoreo Evaluación de Seguimiento Final · Mayo 2026 · Actualización automática cada 2 min</p>
     </div>
   </div>
   <div class="header-right">
@@ -6290,7 +6290,7 @@ async function loadAll() {
     ? ` · <span style="color:#EF9F27;font-size:11px">⚠ ${warnings.join('; ')}</span>`
     : '';
   document.getElementById('upd').innerHTML =
-    `${t} · PC: ${pc.length} registros · SC: ${sc.length} registros · ${ALL.filter(esSectorOK).length} total${warnHtml}`;
+    `${t} · 1er Ciclo: ${pc.length} registros · 2do Ciclo: ${sc.length} registros · ${ALL.filter(esSectorOK).length} total${warnHtml}`;
 
   cascadeR();
 }
