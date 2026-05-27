@@ -361,18 +361,16 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
         <div class="centro-drop" id="fC-drop"></div>
         <input type="hidden" id="fC">
       </div>
-      <div class="fgrp"><label>Sector</label>
-        <select id="fSec" onchange="cascadeR()">
-          <option value="">Público y semioficial</option>
-          <option value="PÚBLICO">Solo público</option>
-          <option value="SEMIOFICIAL">Solo semioficial</option>
+      <div class="fgrp"><label>Tipo de centro</label>
+        <select id="fTipo" onchange="cascadeR()">
+          <option value="">Todos</option>
         </select>
       </div>
       <div class="fgrp"><label>Tanda</label><select id="fT" onchange="renderAll()"><option value="">Todas</option></select></div>
     </div>
     <div class="sector-note">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      Solo se muestran centros del sector público y semioficial
+      Se excluyen los centros privados. Puede filtrar por tipo de centro según los datos disponibles.
     </div>
   </div>
 
@@ -5576,7 +5574,12 @@ const CATALOGO_DATA = [
 ];
 
 const CATALOGO = CATALOGO_DATA.map(r => ({
-  codigo: r[0], regional: r[1], distrito: r[2], nombre: r[3], sector: r[4]
+  codigo: r[0],
+  regional: r[1],
+  distrito: r[2],
+  nombre: r[3],
+  sector: r[4],
+  tipoCentro: r[5] || ''
 }));
 
 let ALL = [], drillMode = 'general', gGrado = null, gReg = null;
@@ -5653,6 +5656,7 @@ async function fetchEval(id) {
       else if (kn.includes('CENTRO') || kn.includes('NOMBRE')) out['CENTRO EDUCATIVO']   = (v || '').trim();
       else if (kn === 'SECTOR')                                 out['SECTOR']             = (v || '').trim();
       else if (kn === 'TANDA')                                  out['TANDA']              = (v || '').trim();
+      else if (kn.includes('TIPO') && kn.includes('CENTRO'))     out['TIPO DE CENTRO']     = (v || '').trim();
       else                                                      out[k] = v;
     }
     return out;
@@ -5671,10 +5675,31 @@ function uniq(arr) { return [...new Set(arr.filter(Boolean))].sort(); }
 function norm(s) { return (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 
 function esSectorOK(r) {
-  const sec  = norm(r['SECTOR'] || '');
-  const fSec = norm(document.getElementById('fSec').value || '');
-  if (fSec) return sec === fSec;
+  const sec = norm(r['SECTOR'] || '');
   return SECTORES_OK.some(s => sec.includes(norm(s)));
+}
+
+function getTipoCentroFromRow(r) {
+  return (r['TIPO DE CENTRO'] || r['TIPO CENTRO'] || r['TIPO'] || '').trim();
+}
+
+function getTipoCentroFromCatalog(c) {
+  if (c.tipoCentro) return c.tipoCentro;
+  const cod = normCod(c.codigo);
+  const row = ALL.find(r => normCod(r['Código SIGERD']) === cod && getTipoCentroFromRow(r));
+  return row ? getTipoCentroFromRow(row) : '';
+}
+
+function esTipoOKRow(r) {
+  const fTipo = norm(document.getElementById('fTipo')?.value || '');
+  if (!fTipo) return true;
+  return norm(getTipoCentroFromRow(r)) === fTipo;
+}
+
+function esTipoOKCatalog(c) {
+  const fTipo = norm(document.getElementById('fTipo')?.value || '');
+  if (!fTipo) return true;
+  return norm(getTipoCentroFromCatalog(c)) === fTipo;
 }
 
 function rowTotals(r) {
@@ -5692,43 +5717,67 @@ function popSelect(id, vals, ph) {
   if (vals.includes(prev)) el.value = prev;
 }
 
+function poblarTiposCentro() {
+  const tiposCatalogo = CATALOGO.map(c => getTipoCentroFromCatalog(c)).filter(Boolean);
+  const tiposDatos = ALL.map(r => getTipoCentroFromRow(r)).filter(Boolean);
+  popSelect('fTipo', uniq([...tiposCatalogo, ...tiposDatos]), 'Todos');
+}
+
+function catalogoBase() {
+  return CATALOGO.filter(c => {
+    if (!SECTORES_OK.some(s => norm(c.sector).includes(norm(s)))) return false;
+    if (!esTipoOKCatalog(c)) return false;
+    return true;
+  });
+}
+
 function cascadeR() {
-  const fSec = norm(document.getElementById('fSec').value || '');
-  const base = CATALOGO.filter(c => !fSec || norm(c.sector) === fSec);
+  const regActual = document.getElementById('fR').value;
+  const base = catalogoBase();
   popSelect('fR', uniq(base.map(c => c.regional)), 'Todas');
-  document.getElementById('fD').innerHTML = '<option value="">Todos</option>';
-  document.getElementById('fC').innerHTML = '<option value="">Todos</option>';
+
+  if (regActual && document.getElementById('fR').value !== regActual) {
+    document.getElementById('fD').value = '';
+    clearCentro(false);
+  }
+
   cascadeD();
 }
+
 function cascadeD() {
-  const reg  = document.getElementById('fR').value;
-  const fSec = norm(document.getElementById('fSec').value || '');
-  let base = CATALOGO.filter(c => !fSec || norm(c.sector) === fSec);
+  const reg = document.getElementById('fR').value;
+  const distActual = document.getElementById('fD').value;
+
+  let base = catalogoBase();
   if (reg) base = base.filter(c => c.regional === reg);
+
   popSelect('fD', uniq(base.map(c => c.distrito)), 'Todos');
-  document.getElementById('fC').innerHTML = '<option value="">Todos</option>';
+
+  if (distActual && document.getElementById('fD').value !== distActual) {
+    clearCentro(false);
+  }
+
   cascadeC();
 }
+
 function cascadeC() {
   const reg  = document.getElementById('fR').value;
   const dist = document.getElementById('fD').value;
-  const fSec = norm(document.getElementById('fSec').value || '');
 
-  // Build the pool of centros for the current regional/distrito/sector
-  let catBase = CATALOGO.filter(c => !fSec || norm(c.sector) === fSec);
+  let catBase = catalogoBase();
   if (reg)  catBase = catBase.filter(c => c.regional === reg);
   if (dist) catBase = catBase.filter(c => c.distrito === dist);
-  // Store as global for the autocomplete to use
+
   window._centroPool = catBase;
 
-  // If a centro is selected but no longer in pool, clear it
   const selCod = document.getElementById('fC').value;
   if (selCod && !catBase.some(c => c.codigo === selCod)) clearCentro(false);
 
-  // Tandas from ALL
-  let allBase = ALL.filter(esSectorOK);
+  let allBase = ALL.filter(r => esSectorOK(r) && esTipoOKRow(r));
   if (reg)  allBase = allBase.filter(r => r['REGIONAL'] === reg);
   if (dist) allBase = allBase.filter(r => r['DISTRITO EDUCATIVO'] === dist);
+  if (selCod) allBase = allBase.filter(r => normCod(r['Código SIGERD']) === normCod(selCod));
+
   const tandas = uniq(allBase
     .map(r => (r['TANDA'] || '').trim())
     .filter(t => t.length > 1 && t.length < 30 && !/^\d+$/.test(t))
@@ -5738,10 +5787,34 @@ function cascadeC() {
   renderAll();
 }
 
+function aplicarCentroAFiltros(codigo) {
+  const centro = CATALOGO.find(c => c.codigo === codigo);
+  if (!centro) return;
+
+  const tipoCentro = getTipoCentroFromCatalog(centro);
+  if (tipoCentro) {
+    const fTipo = document.getElementById('fTipo');
+    if (![...fTipo.options].some(o => o.value === tipoCentro)) {
+      fTipo.add(new Option(tipoCentro, tipoCentro));
+    }
+    fTipo.value = tipoCentro;
+  }
+
+  popSelect('fR', uniq(catalogoBase().map(c => c.regional)), 'Todas');
+  document.getElementById('fR').value = centro.regional;
+
+  let baseDist = catalogoBase().filter(c => c.regional === centro.regional);
+  popSelect('fD', uniq(baseDist.map(c => c.distrito)), 'Todos');
+  document.getElementById('fD').value = centro.distrito;
+
+  let pool = baseDist.filter(c => c.distrito === centro.distrito);
+  window._centroPool = pool;
+}
+
 function fr() {
   const reg     = document.getElementById('fR').value;
   const dist    = document.getElementById('fD').value;
-  const ctrCod  = document.getElementById('fC').value;  // codigo from CATALOGO
+  const ctrCod  = document.getElementById('fC').value;
   const tan     = document.getElementById('fT').value;
 
   const codigosFiltro = ctrCod
@@ -5750,6 +5823,7 @@ function fr() {
 
   return ALL.filter(r => {
     if (!esSectorOK(r)) return false;
+    if (!esTipoOKRow(r)) return false;
     if (reg  && r['REGIONAL'] !== reg)            return false;
     if (dist && r['DISTRITO EDUCATIVO'] !== dist) return false;
     if (codigosFiltro && !codigosFiltro.has(normCod(r['Código SIGERD']))) return false;
@@ -5761,11 +5835,12 @@ function fr() {
 function catFiltrado() {
   const reg  = document.getElementById('fR').value;
   const dist = document.getElementById('fD').value;
-  const fSec = norm(document.getElementById('fSec').value || '');
-  return CATALOGO.filter(c => {
-    if (fSec && norm(c.sector) !== fSec) return false;
+  const ctr  = document.getElementById('fC').value;
+
+  return catalogoBase().filter(c => {
     if (reg  && c.regional !== reg)      return false;
     if (dist && c.distrito !== dist)     return false;
+    if (ctr  && normCod(c.codigo) !== normCod(ctr)) return false;
     return true;
   });
 }
@@ -6088,12 +6163,13 @@ function renderCentroDrop(q) {
 }
 
 function selectCentro(codigo, nombre) {
+  aplicarCentroAFiltros(codigo);
   document.getElementById('fC-input').value = nombre;
   document.getElementById('fC').value = codigo;
   document.getElementById('fC-clear').style.display = 'block';
   document.getElementById('fC-drop').classList.remove('open');
   _centroActiveIdx = -1;
-  renderAll();
+  cascadeC();
 }
 
 function clearCentro(doRender = true) {
@@ -6172,20 +6248,13 @@ async function loadAll() {
   }
 
   if (!pc.length && !sc.length) {
-    const enc = encodeURIComponent;
+    console.warn('[SIREV] No se pudieron cargar los datos:', warnings);
     document.getElementById('msg').innerHTML = `
       <div style="font-size:32px;margin-bottom:12px">⚠️</div>
-      <strong>No se pudieron cargar los datos</strong><br>
-      <small style="color:var(--text3)">${warnings.join(' | ')}</small>
-      <div class="errtip">
-        <strong>Pasos para resolver:</strong>
-        <ol>
-          <li>Abre cada enlace y espera que cargue:<br>
-            <a href="https://corsproxy.io/?${enc(csvUrl(IDS.pc))}" target="_blank">📄 Primer ciclo →</a><br>
-            <a href="https://corsproxy.io/?${enc(csvUrl(IDS.sc))}" target="_blank">📄 Segundo ciclo →</a>
-          </li>
-          <li>Cierra esas pestañas y presiona Reintentar</li>
-        </ol>
+      <strong>No se pudieron cargar los datos en este momento</strong><br>
+      <small style="color:var(--text3)">Verifique la conexión e intente nuevamente.</small>
+      <div class="errtip" style="text-align:center">
+        El sistema no mostrará enlaces técnicos ni rutas de descarga de datos.
       </div><br>
       <button class="btn" onclick="loadAll()" style="margin:0 auto">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -6195,6 +6264,7 @@ async function loadAll() {
   }
 
   ALL = [...pc, ...sc];
+  poblarTiposCentro();
 
   document.getElementById('msg').style.display = 'none';
   document.getElementById('dc').style.display  = 'block';
