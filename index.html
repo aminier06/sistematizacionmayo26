@@ -799,7 +799,7 @@ function renderDrill(rows) {
   const groups = uniq(cat.map(c=>c[groupKey]));
   document.getElementById('drill-title').textContent = drillMode==='regional' ? 'Avance por regional' : 'Avance por distrito';
   document.getElementById('drill-info').textContent = `${groups.length} ${drillMode==='regional'?'regionales':'distritos'}`;
-  document.getElementById('drill-head').innerHTML = `<tr><th>${drillMode==='regional'?'Regional':'Distrito'}</th><th class="num">Centros</th><th class="num">PC reportó</th><th>Avance PC</th><th class="num">SC reportó</th><th>Avance SC</th></tr>`;
+  document.getElementById('drill-head').innerHTML = `<tr><th>${drillMode==='regional'?'Regional':'Distrito'}</th><th class="num">Centros</th><th class="num">Reportó Primer Ciclo</th><th>Avance PC</th><th class="num">Reportó Segundo Ciclo</th><th>Avance SC</th></tr>`;
   document.getElementById('drill-body').innerHTML = groups.map(g => {
     const sub = cat.filter(c=>c[groupKey]===g);
     const tot = sub.length;
