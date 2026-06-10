@@ -8119,7 +8119,10 @@ async function fetchEval(id) {
 
 function num(r, k) { return parseInt(r[k] || 0) || 0; }
 function uniq(arr) { return [...new Set(arr.filter(Boolean))].sort(); }
-function norm(s) { return (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function norm(s) { return (s || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' '); }
+
+// Compara dos campos de texto ignorando tildes, mayúsculas/minúsculas y espacios extras
+function normEq(a, b) { return norm(a) === norm(b); }
 
 function esSectorOK(r) {
   const sec = norm(r['SECTOR'] || '');
@@ -8161,7 +8164,11 @@ function covColor(pct) { return pct >= 80 ? '#1D9E75' : pct >= 50 ? '#EF9F27' : 
 function popSelect(id, vals, ph) {
   const el = document.getElementById(id), prev = el.value;
   el.innerHTML = `<option value="">${ph}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join('');
-  if (vals.includes(prev)) el.value = prev;
+  // Restore previous value, tolerating minor spacing/accent differences
+  if (prev) {
+    const match = vals.find(v => v === prev) || vals.find(v => normEq(v, prev));
+    if (match) el.value = match;
+  }
 }
 
 function poblarTiposCentro() {
@@ -8196,7 +8203,7 @@ function cascadeD() {
   const distActual = document.getElementById('fD').value;
 
   let base = catalogoBase();
-  if (reg) base = base.filter(c => c.regional === reg);
+  if (reg) base = base.filter(c => normEq(c.regional, reg));
 
   popSelect('fD', uniq(base.map(c => c.distrito)), 'Todos');
 
@@ -8212,8 +8219,8 @@ function cascadeC() {
   const dist = document.getElementById('fD').value;
 
   let catBase = catalogoBase();
-  if (reg)  catBase = catBase.filter(c => c.regional === reg);
-  if (dist) catBase = catBase.filter(c => c.distrito === dist);
+  if (reg)  catBase = catBase.filter(c => normEq(c.regional, reg));
+  if (dist) catBase = catBase.filter(c => normEq(c.distrito, dist));
 
   window._centroPool = catBase;
 
@@ -8221,8 +8228,8 @@ function cascadeC() {
   if (selCod && !catBase.some(c => c.codigo === selCod)) clearCentro(false);
 
   let allBase = ALL.filter(r => esSectorOK(r) && esTipoOKRow(r));
-  if (reg)  allBase = allBase.filter(r => r['REGIONAL'] === reg);
-  if (dist) allBase = allBase.filter(r => r['DISTRITO EDUCATIVO'] === dist);
+  if (reg)  allBase = allBase.filter(r => normEq(r['REGIONAL'], reg));
+  if (dist) allBase = allBase.filter(r => normEq(r['DISTRITO EDUCATIVO'], dist));
   if (selCod) allBase = allBase.filter(r => normCod(r['Código SIGERD']) === normCod(selCod));
 
   const tandas = uniq(allBase
@@ -8248,13 +8255,18 @@ function aplicarCentroAFiltros(codigo) {
   }
 
   popSelect('fR', uniq(catalogoBase().map(c => c.regional)), 'Todas');
-  document.getElementById('fR').value = centro.regional;
+  // Seleccionar la opción cuyo valor normalizado coincide con el regional del centro
+  const fR = document.getElementById('fR');
+  const matchR = [...fR.options].find(o => normEq(o.value, centro.regional));
+  if (matchR) fR.value = matchR.value;
 
-  let baseDist = catalogoBase().filter(c => c.regional === centro.regional);
+  let baseDist = catalogoBase().filter(c => normEq(c.regional, centro.regional));
   popSelect('fD', uniq(baseDist.map(c => c.distrito)), 'Todos');
-  document.getElementById('fD').value = centro.distrito;
+  const fD = document.getElementById('fD');
+  const matchD = [...fD.options].find(o => normEq(o.value, centro.distrito));
+  if (matchD) fD.value = matchD.value;
 
-  let pool = baseDist.filter(c => c.distrito === centro.distrito);
+  let pool = baseDist.filter(c => normEq(c.distrito, centro.distrito));
   window._centroPool = pool;
 }
 
@@ -8271,8 +8283,8 @@ function fr() {
   return ALL.filter(r => {
     if (!esSectorOK(r)) return false;
     if (!esTipoOKRow(r)) return false;
-    if (reg  && r['REGIONAL'] !== reg)            return false;
-    if (dist && r['DISTRITO EDUCATIVO'] !== dist) return false;
+    if (reg  && !normEq(r['REGIONAL'], reg))            return false;
+    if (dist && !normEq(r['DISTRITO EDUCATIVO'], dist)) return false;
     if (codigosFiltro && !codigosFiltro.has(normCod(r['Código SIGERD']))) return false;
     if (tan  && r['TANDA'] !== tan)               return false;
     return true;
@@ -8285,8 +8297,8 @@ function catFiltrado() {
   const ctr  = document.getElementById('fC').value;
 
   return catalogoBase().filter(c => {
-    if (reg  && c.regional !== reg)      return false;
-    if (dist && c.distrito !== dist)     return false;
+    if (reg  && !normEq(c.regional, reg))      return false;
+    if (dist && !normEq(c.distrito, dist))     return false;
     if (ctr  && normCod(c.codigo) !== normCod(ctr)) return false;
     return true;
   });
@@ -8513,8 +8525,8 @@ function renderCentros(rows) {
   const dist = document.getElementById('fD').value;
   const ctr  = document.getElementById('fC').value;
   let centros = cat;
-  if (reg)  centros = centros.filter(c => c.regional === reg);
-  if (dist) centros = centros.filter(c => c.distrito === dist);
+  if (reg)  centros = centros.filter(c => normEq(c.regional, reg));
+  if (dist) centros = centros.filter(c => normEq(c.distrito, dist));
   if (ctr)  centros = centros.filter(c => c.nombre === ctr || c.codigo === ctr);
   centros.sort((a, b) =>
     a.regional.localeCompare(b.regional) ||
@@ -8524,19 +8536,24 @@ function renderCentros(rows) {
 
   document.getElementById('count-centros').textContent = `${centros.length} centros`;
 
-  const cicloCell = (reported) => reported
-    ? '<td style="text-align:center;font-size:16px;color:var(--green)">✔</td>'
-    : '<td style="text-align:center;font-size:16px;color:var(--red)">✗</td>';
+  const cicloCell = (reported, aplica) => {
+    if (!aplica) return '<td style="text-align:center;font-size:11px;color:#aab4be;background:rgba(0,0,0,.03);letter-spacing:.04em">N/A</td>';
+    return reported
+      ? '<td style="text-align:center;font-size:16px;color:var(--green)">✔</td>'
+      : '<td style="text-align:center;font-size:16px;color:var(--red)">✗</td>';
+  };
 
   document.getElementById('tbody-centros').innerHTML = centros.map(c => {
     const hasPC = !!repPC[normCod(c.codigo)];
     const hasSC = !!repSC[normCod(c.codigo)];
+    const aplicaPC = CODIGOS_PC.has(c.codigo);
+    const aplicaSC = CODIGOS_SC.has(c.codigo);
     return `<tr>
       <td>${c.regional}</td>
       <td>${c.distrito}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${c.nombre}">${c.nombre}</td>
-      ${cicloCell(hasPC)}
-      ${cicloCell(hasSC)}
+      ${cicloCell(hasPC, aplicaPC)}
+      ${cicloCell(hasSC, aplicaSC)}
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text3)">Sin centros en el catálogo</td></tr>';
 }
