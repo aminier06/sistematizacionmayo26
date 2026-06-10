@@ -8365,21 +8365,36 @@ function renderGauges(rows) {
   const pctSC = totSC > 0 ? Math.round(cntSC / totSC * 100) : 0;
   const colPC = covColor(pctPC), colSC = covColor(pctSC);
 
-  drawGauge('gauge-pc', pctPC, colPC);
-  drawGauge('gauge-sc', pctSC, colSC);
+  // Show/hide each gauge card based on whether there are centers for that cycle
+  const cardPC = document.getElementById('gauge-pc').closest('.gauge-card');
+  const cardSC = document.getElementById('gauge-sc').closest('.gauge-card');
+  cardPC.style.display = totPC > 0 ? '' : 'none';
+  cardSC.style.display = totSC > 0 ? '' : 'none';
 
-  document.getElementById('gauge-pct-pc').textContent = pctPC + '%';
-  document.getElementById('gauge-pct-pc').style.color  = colPC;
-  document.getElementById('gauge-pct-sc').textContent = pctSC + '%';
-  document.getElementById('gauge-pct-sc').style.color  = colSC;
-  document.getElementById('gauge-sub-pc').textContent = `${cntPC} de ${totPC} centros han reportado`;
-  document.getElementById('gauge-sub-sc').textContent = `${cntSC} de ${totSC} centros han reportado`;
-  document.getElementById('gs-pc-rep').textContent = cntPC;
-  document.getElementById('gs-pc-pen').textContent = totPC - cntPC;
-  document.getElementById('gs-pc-tot').textContent = totPC;
-  document.getElementById('gs-sc-rep').textContent = cntSC;
-  document.getElementById('gs-sc-pen').textContent = totSC - cntSC;
-  document.getElementById('gs-sc-tot').textContent = totSC;
+  // Adjust grid: if only one card visible, give it full width
+  const grid = cardPC.closest('.gauges-grid');
+  const bothVisible = totPC > 0 && totSC > 0;
+  grid.style.gridTemplateColumns = bothVisible ? '1fr 1fr' : '1fr';
+
+  if (totPC > 0) {
+    drawGauge('gauge-pc', pctPC, colPC);
+    document.getElementById('gauge-pct-pc').textContent = pctPC + '%';
+    document.getElementById('gauge-pct-pc').style.color  = colPC;
+    document.getElementById('gauge-sub-pc').textContent = `${cntPC} de ${totPC} centros han reportado`;
+    document.getElementById('gs-pc-rep').textContent = cntPC;
+    document.getElementById('gs-pc-pen').textContent = totPC - cntPC;
+    document.getElementById('gs-pc-tot').textContent = totPC;
+  }
+
+  if (totSC > 0) {
+    drawGauge('gauge-sc', pctSC, colSC);
+    document.getElementById('gauge-pct-sc').textContent = pctSC + '%';
+    document.getElementById('gauge-pct-sc').style.color  = colSC;
+    document.getElementById('gauge-sub-sc').textContent = `${cntSC} de ${totSC} centros han reportado`;
+    document.getElementById('gs-sc-rep').textContent = cntSC;
+    document.getElementById('gs-sc-pen').textContent = totSC - cntSC;
+    document.getElementById('gs-sc-tot').textContent = totSC;
+  }
 }
 
 function setDrill(mode, btn) {
