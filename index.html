@@ -384,7 +384,12 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       Se excluyen los centros privados. Puede filtrar por tipo de centro según los datos disponibles.
     </div>
-  </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button class="btn" id="btn-clear-filters" onclick="clearFilters()" style="background:#f1f5fb;color:var(--text2);border:1px solid #d6e1ef" title="Restablecer todos los filtros">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+        Limpiar filtros
+      </button>
+    </div>
 
   <div class="kpis" id="kpis"></div>
 
@@ -465,7 +470,13 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
     <div class="tbl-wrap">
       <div class="tbl-header">
         <h3>Todos los centros</h3>
-        <span class="tbl-info" id="count-centros"></span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="tbl-info" id="count-centros"></span>
+          <button class="btn" onclick="exportarExcel()" title="Exportar vista actual a Excel" style="background:#1a6e3a;color:#fff;border:none;gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Exportar Excel
+          </button>
+        </div>
       </div>
       <div class="tbl-scroll">
         <table>
@@ -487,6 +498,7 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
 </footer>
 
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const SECTORES_OK = ['público','publico','semioficial'];
 const IDS = {
@@ -8647,6 +8659,110 @@ function renderAll() {
   renderDrill(rows);
   renderCharts(rows);
   renderCentros(rows);
+}
+
+// ── Limpiar filtros ───────────────────────────────────────────────────────────
+function clearFilters() {
+  // Reset dropdowns to first option
+  ['fR', 'fD', 'fTipo', 'fT'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.selectedIndex = 0;
+  });
+  // Clear centro search
+  clearCentro(false);
+  // Re-populate cascaded selects
+  cascadeR();
+}
+
+// ── Exportar a Excel ──────────────────────────────────────────────────────────
+function exportarExcel() {
+  const rows = fr();
+  const cat  = catFiltrado();
+
+  const repPC = {};
+  const repSC = {};
+  rows.filter(r => r._ciclo === 'pc').forEach(r => { repPC[normCod(r['Código SIGERD'])] = true; });
+  rows.filter(r => r._ciclo === 'sc').forEach(r => { repSC[normCod(r['Código SIGERD'])] = true; });
+
+  const reg  = document.getElementById('fR').value;
+  const dist = document.getElementById('fD').value;
+  const ctr  = document.getElementById('fC').value;
+  let centros = cat;
+  if (reg)  centros = centros.filter(c => normEq(c.regional, reg));
+  if (dist) centros = centros.filter(c => normEq(c.distrito, dist));
+  if (ctr)  centros = centros.filter(c => c.nombre === ctr || c.codigo === ctr);
+  centros.sort((a, b) =>
+    a.regional.localeCompare(b.regional) ||
+    a.distrito.localeCompare(b.distrito) ||
+    a.nombre.localeCompare(b.nombre)
+  );
+
+  const statusLabel = (reported, aplica) => {
+    if (!aplica) return 'N/A';
+    return reported ? 'Reportó' : 'Pendiente';
+  };
+
+  // Build data array
+  const data = [['Regional', 'Distrito', 'Código', 'Centro educativo', '1er Ciclo (1ro–3ro)', '2do Ciclo (4to–6to)']];
+  centros.forEach(c => {
+    const hasPC  = !!repPC[normCod(c.codigo)];
+    const hasSC  = !!repSC[normCod(c.codigo)];
+    const aplPC  = CODIGOS_PC.has(c.codigo);
+    const aplSC  = CODIGOS_SC.has(c.codigo);
+    data.push([
+      c.regional,
+      c.distrito,
+      c.codigo,
+      c.nombre,
+      statusLabel(hasPC, aplPC),
+      statusLabel(hasSC, aplSC)
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 32 }, { wch: 34 }, { wch: 10 }, { wch: 44 }, { wch: 22 }, { wch: 22 }
+  ];
+
+  // Style header row (bold + background) — limited by SheetJS community edition
+  const headerRange = XLSX.utils.decode_range('A1:F1');
+  for (let C = headerRange.s.c; C <= headerRange.e.c; C++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+    if (!ws[addr]) continue;
+    ws[addr].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '0B5FA5' } },
+      alignment: { horizontal: 'center' }
+    };
+  }
+
+  // Color-code status cells: green for Reportó, red for Pendiente
+  for (let R = 1; R < data.length; R++) {
+    ['E', 'F'].forEach(col => {
+      const addr = col + (R + 1);
+      if (!ws[addr]) return;
+      const val = ws[addr].v;
+      if (val === 'Reportó') {
+        ws[addr].s = { font: { color: { rgb: '15936F' }, bold: true }, alignment: { horizontal: 'center' } };
+      } else if (val === 'Pendiente') {
+        ws[addr].s = { font: { color: { rgb: 'D94A45' }, bold: true }, alignment: { horizontal: 'center' } };
+      } else {
+        ws[addr].s = { font: { color: { rgb: 'AAB4BE' } }, alignment: { horizontal: 'center' } };
+      }
+    });
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Reporte de centros');
+
+  // Filename with current filters and date
+  const now = new Date();
+  const fecha = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+  const regTag = reg ? '_' + reg.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20) : '';
+  const distTag = dist ? '_' + dist.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20) : '';
+  XLSX.writeFile(wb, `SIREV_Centros${regTag}${distTag}_${fecha}.xlsx`);
 }
 
 // ── loadAll con Promise.allSettled ────────────────────────────────────────────
