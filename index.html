@@ -536,6 +536,7 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const SECTORES_OK = ['público','publico','semioficial'];
+function fmtN(n) { return Number(n).toLocaleString('es-DO'); }
 const IDS = {
   pc: '2PACX-1vSgWQ4GaAwm8gCAkOUU47IM_M0EneHHDg774yY1QfmuZeXyV0VXFJfeO752SP0yhDfVNCvZILpLpHTc',
   sc: '2PACX-1vSE7lqSqf1Ugps--yciQGl9iXDwcuRXq7DmPolyClxNqtILprSaixafW7j_gFOq_tmePtoY-hpUj6XH'
