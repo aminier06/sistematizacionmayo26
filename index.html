@@ -8534,13 +8534,14 @@ function fr() {
 }
 
 function catFiltrado() {
+  if (window._catFiltradoCache) return window._catFiltradoCache;
   const reg  = document.getElementById('fR').value;
   const dist = document.getElementById('fD').value;
   const ctr  = document.getElementById('fC').value;
 
   return catalogoBase().filter(c => {
-    if (reg  && !normEq(c.regional, reg))      return false;
-    if (dist && !normEq(c.distrito, dist))     return false;
+    if (reg  && !normEq(c.regional, reg))           return false;
+    if (dist && !normEq(c.distrito, dist))           return false;
     if (ctr  && normCod(c.codigo) !== normCod(ctr)) return false;
     return true;
   });
@@ -8887,11 +8888,14 @@ function renderCentros(rows) {
 
 function renderAll() {
   const rows = fr();
+  // Cache catFiltrado so each render sub-function doesn't recompute it
+  window._catFiltradoCache = catFiltrado();
   renderKPIs(rows);
   renderGauges(rows);
   renderDrill(rows);
   renderCharts(rows);
   renderCentros(rows);
+  window._catFiltradoCache = null;
 }
 
 // ── Limpiar filtros ───────────────────────────────────────────────────────────
@@ -9002,6 +9006,7 @@ function exportarExcel() {
 // ── Centro autocomplete ──────────────────────────────────────────────────
 window._centroPool = [];
 let _centroActiveIdx = -1;
+let _centroDebounceTimer = null;
 
 function _centroMatches(query) {
   if (!query) return [];
@@ -9029,13 +9034,15 @@ function onCentroInput() {
   const clr = document.getElementById('fC-clear');
   clr.style.display = q ? 'block' : 'none';
 
-  // If input was cleared or changed, clear the hidden value
+  // If a centro was selected and user changed the text, clear hidden code
+  // but debounce the renderAll — no re-render on every keystroke
   const selCod = document.getElementById('fC').value;
   if (selCod) {
     const selEntry = window._centroPool.find(c => c.codigo === selCod);
     if (!selEntry || selEntry.nombre !== q) {
       document.getElementById('fC').value = '';
-      renderAll();
+      clearTimeout(_centroDebounceTimer);
+      _centroDebounceTimer = setTimeout(() => renderAll(), 400);
     }
   }
   renderCentroDrop(q);
@@ -9065,13 +9072,19 @@ function renderCentroDrop(q) {
 }
 
 function selectCentro(codigo, nombre) {
+  clearTimeout(_centroDebounceTimer);
   aplicarCentroAFiltros(codigo);
   document.getElementById('fC-input').value = nombre;
   document.getElementById('fC').value = codigo;
   document.getElementById('fC-clear').style.display = 'block';
   document.getElementById('fC-drop').classList.remove('open');
   _centroActiveIdx = -1;
-  cascadeC();
+  // Populate tanda for this specific centro without full cascadeC overhead
+  const allBase = ALL.filter(r => esSectorOK(r) && normCod(r['Código SIGERD']) === normCod(codigo));
+  const tandas = uniq(allBase.map(r => getTandaFromRow(r)).filter(t => t.length > 1 && t.length < 30 && !/^\d+$/.test(t)));
+  popSelect('fT', tandas, 'Todas');
+  // Render in next frame so the UI updates (dropdown close) before heavy work
+  requestAnimationFrame(() => renderAll());
 }
 
 function clearCentro(doRender = true) {
