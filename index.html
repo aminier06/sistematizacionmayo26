@@ -347,22 +347,9 @@ tbody td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:
   color:#fff; box-shadow:0 6px 16px rgba(11,95,165,.25);
 }
 .ptab.active .ptab-sub { opacity:.85; }
-
-/* Mode-specific visibility */
-.live-only { display:none; }
-.hist-only { display:none; }
-body.mode-live  .live-only { display:flex; }
-body.mode-hist  .hist-only { display:block; }
-body.mode-live  #live-pill-wrap { display:flex; }
-body.mode-hist  #live-pill-wrap { display:none; }
-body.mode-live  #hist-info-bar { display:none; }
-body.mode-hist  #hist-info-bar { display:flex; }
-#hist-info-bar {
-  align-items:center; gap:7px; font-size:12px; color:rgba(255,255,255,.82);
-}
 </style>
 </head>
-<body class="mode-live">
+<body>
 <div class="shell">
 
 <div class="header">
@@ -377,10 +364,8 @@ body.mode-hist  #hist-info-bar { display:flex; }
     </div>
   </div>
   <div class="header-right">
-    <div id="live-pill-wrap" class="live-pill live-only"><span class="dot"></span> En vivo</div>
-    <span id="hist-info-bar" class="hist-only"></span>
-    <span id="upd">—</span>
-    <button class="btn live-only" onclick="loadAll()">
+    <span id="upd" style="font-size:12px;color:rgba(255,255,255,.75)">—</span>
+  </div>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
       Actualizar
     </button>
@@ -403,7 +388,7 @@ body.mode-hist  #hist-info-bar { display:flex; }
   </button>
   <button class="ptab active" onclick="setPeriod('MAYO',this)" role="tab">
     <span class="ptab-label">Mayo</span>
-    <span class="ptab-sub">2026 · En vivo</span>
+    <span class="ptab-sub">Mayo 2026 · Definitivo</span>
   </button>
 </div>
 
@@ -8095,39 +8080,31 @@ const CODIGOS_SC = new Set(["00002", "00003", "00004", "00005", "00006", "00007"
 const HIST_D = {"SEPT":{"kpis":{"centros":4941,"regs":18,"dists":122,"mat":885402,"ev":854705,"cov":96.5},"gauge":{"pc":{"rep":4881,"tot":5088,"pct":95.9},"sc":{"rep":4570,"tot":5088,"pct":89.8}},"grades":{"1ro":{"mat":137681,"ev":131823},"2do":{"mat":142491,"ev":138397},"3ro":{"mat":152678,"ev":148972},"4to":{"mat":149910,"ev":146517},"5to":{"mat":154732,"ev":146384},"6to":{"mat":147910,"ev":142612}},"regional":[{"reg":"01 - BARAHONA","mat":29841,"ev":27854,"pct":93.3},{"reg":"02 - SAN JUAN DE LA MAGUANA","mat":35011,"ev":33440,"pct":95.5},{"reg":"03 - AZUA","mat":48683,"ev":46272,"pct":95.0},{"reg":"04 - SAN CRISTOBAL","mat":63894,"ev":60753,"pct":95.1},{"reg":"05 - SAN PEDRO DE MACORIS","mat":63085,"ev":59187,"pct":93.8},{"reg":"06 - LA VEGA","mat":53299,"ev":52076,"pct":97.7},{"reg":"07 - SAN FRANCISCO DE MACORIS","mat":27769,"ev":27511,"pct":99.1},{"reg":"08 - SANTIAGO","mat":78559,"ev":76672,"pct":97.6},{"reg":"09 - MAO","mat":22007,"ev":21400,"pct":97.2},{"reg":"10 - SANTO DOMINGO","mat":151534,"ev":143257,"pct":94.5},{"reg":"11 - PUERTO PLATA","mat":27349,"ev":26752,"pct":97.8},{"reg":"12 - HIGUEY","mat":47063,"ev":43790,"pct":93.0},{"reg":"13 - MONTE CRISTI","mat":20184,"ev":22450,"pct":111.2},{"reg":"14 - NAGUA","mat":25474,"ev":24936,"pct":97.9},{"reg":"15 - SANTO DOMINGO","mat":117751,"ev":113318,"pct":96.2},{"reg":"16 - COTUI","mat":30253,"ev":29855,"pct":98.7},{"reg":"17 - MONTE PLATA","mat":24166,"ev":23763,"pct":98.3},{"reg":"18 - BAHORUCO","mat":19480,"ev":21419,"pct":110.0}],"drill_reg":[{"name":"01 - BARAHONA","tot":161,"pc":154,"sc":143,"ppc":95.7,"psc":88.8},{"name":"02 - SAN JUAN DE LA MAGUANA","tot":365,"pc":343,"sc":314,"ppc":94.0,"psc":86.0},{"name":"03 - AZUA","tot":318,"pc":295,"sc":291,"ppc":92.8,"psc":91.5},{"name":"04 - SAN CRISTOBAL","tot":307,"pc":304,"sc":278,"ppc":99.0,"psc":90.6},{"name":"05 - SAN PEDRO DE MACORIS","tot":340,"pc":322,"sc":292,"ppc":94.7,"psc":85.9},{"name":"06 - LA VEGA","tot":431,"pc":422,"sc":412,"ppc":97.9,"psc":95.6},{"name":"07 - SAN FRANCISCO DE MACORIS","tot":329,"pc":315,"sc":296,"ppc":95.7,"psc":90.0},{"name":"08 - SANTIAGO","tot":361,"pc":355,"sc":329,"ppc":98.3,"psc":91.1},{"name":"09 - MAO","tot":187,"pc":181,"sc":164,"ppc":96.8,"psc":87.7},{"name":"10 - SANTO DOMINGO","tot":370,"pc":352,"sc":345,"ppc":95.1,"psc":93.2},{"name":"11 - PUERTO PLATA","tot":266,"pc":258,"sc":243,"ppc":97.0,"psc":91.4},{"name":"12 - HIGUEY","tot":237,"pc":228,"sc":208,"ppc":96.2,"psc":87.8},{"name":"13 - MONTE CRISTI","tot":192,"pc":185,"sc":159,"ppc":96.4,"psc":82.8},{"name":"14 - NAGUA","tot":275,"pc":271,"sc":241,"ppc":98.5,"psc":87.6},{"name":"15 - SANTO DOMINGO","tot":288,"pc":271,"sc":265,"ppc":94.1,"psc":92.0},{"name":"16 - COTUI","tot":271,"pc":256,"sc":241,"ppc":94.5,"psc":88.9},{"name":"17 - MONTE PLATA","tot":241,"pc":238,"sc":228,"ppc":98.8,"psc":94.6},{"name":"18 - BAHORUCO","tot":149,"pc":131,"sc":121,"ppc":87.9,"psc":81.2}]},"NOV":{"kpis":{"centros":4869,"regs":18,"dists":122,"mat":864900,"ev":840768,"cov":97.2},"gauge":{"pc":{"rep":4800,"tot":5088,"pct":94.3},"sc":{"rep":4477,"tot":5088,"pct":88.0}},"grades":{"1ro":{"mat":135081,"ev":131877},"2do":{"mat":139690,"ev":136715},"3ro":{"mat":149844,"ev":147848},"4to":{"mat":144794,"ev":144050},"5to":{"mat":151096,"ev":142409},"6to":{"mat":144395,"ev":137869}},"regional":[{"reg":"01 - BARAHONA","mat":27262,"ev":29532,"pct":108.3},{"reg":"02 - SAN JUAN DE LA MAGUANA","mat":34045,"ev":33342,"pct":97.9},{"reg":"03 - AZUA","mat":49223,"ev":46789,"pct":95.1},{"reg":"04 - SAN CRISTOBAL","mat":62141,"ev":59183,"pct":95.2},{"reg":"05 - SAN PEDRO DE MACORIS","mat":60650,"ev":58276,"pct":96.1},{"reg":"06 - LA VEGA","mat":53757,"ev":52457,"pct":97.6},{"reg":"07 - SAN FRANCISCO DE MACORIS","mat":27790,"ev":27418,"pct":98.7},{"reg":"08 - SANTIAGO","mat":75602,"ev":73744,"pct":97.5},{"reg":"09 - MAO","mat":21762,"ev":21305,"pct":97.9},{"reg":"10 - SANTO DOMINGO","mat":146630,"ev":143753,"pct":98.0},{"reg":"11 - PUERTO PLATA","mat":26891,"ev":26413,"pct":98.2},{"reg":"12 - HIGUEY","mat":44271,"ev":41638,"pct":94.1},{"reg":"13 - MONTE CRISTI","mat":19414,"ev":18936,"pct":97.5},{"reg":"14 - NAGUA","mat":25173,"ev":24504,"pct":97.3},{"reg":"15 - SANTO DOMINGO","mat":117532,"ev":112238,"pct":95.5},{"reg":"16 - COTUI","mat":29866,"ev":29008,"pct":97.1},{"reg":"17 - MONTE PLATA","mat":23929,"ev":23541,"pct":98.4},{"reg":"18 - BAHORUCO","mat":18962,"ev":18691,"pct":98.6}],"drill_reg":[{"name":"01 - BARAHONA","tot":161,"pc":150,"sc":139,"ppc":93.2,"psc":86.3},{"name":"02 - SAN JUAN DE LA MAGUANA","tot":365,"pc":336,"sc":310,"ppc":92.1,"psc":84.9},{"name":"03 - AZUA","tot":318,"pc":304,"sc":303,"ppc":95.6,"psc":95.3},{"name":"04 - SAN CRISTOBAL","tot":307,"pc":296,"sc":269,"ppc":96.4,"psc":87.6},{"name":"05 - SAN PEDRO DE MACORIS","tot":340,"pc":314,"sc":277,"ppc":92.4,"psc":81.5},{"name":"06 - LA VEGA","tot":431,"pc":423,"sc":413,"ppc":98.1,"psc":95.8},{"name":"07 - SAN FRANCISCO DE MACORIS","tot":329,"pc":316,"sc":294,"ppc":96.0,"psc":89.4},{"name":"08 - SANTIAGO","tot":361,"pc":338,"sc":304,"ppc":93.6,"psc":84.2},{"name":"09 - MAO","tot":187,"pc":182,"sc":164,"ppc":97.3,"psc":87.7},{"name":"10 - SANTO DOMINGO","tot":370,"pc":341,"sc":334,"ppc":92.2,"psc":90.3},{"name":"11 - PUERTO PLATA","tot":266,"pc":252,"sc":236,"ppc":94.7,"psc":88.7},{"name":"12 - HIGUEY","tot":237,"pc":218,"sc":201,"ppc":92.0,"psc":84.8},{"name":"13 - MONTE CRISTI","tot":192,"pc":180,"sc":156,"ppc":93.8,"psc":81.2},{"name":"14 - NAGUA","tot":275,"pc":262,"sc":237,"ppc":95.3,"psc":86.2},{"name":"15 - SANTO DOMINGO","tot":288,"pc":269,"sc":259,"ppc":93.4,"psc":89.9},{"name":"16 - COTUI","tot":271,"pc":254,"sc":238,"ppc":93.7,"psc":87.8},{"name":"17 - MONTE PLATA","tot":241,"pc":234,"sc":225,"ppc":97.1,"psc":93.4},{"name":"18 - BAHORUCO","tot":149,"pc":131,"sc":118,"ppc":87.9,"psc":79.2}]},"MAR":{"kpis":{"centros":4865,"regs":18,"dists":122,"mat":869902,"ev":834112,"cov":95.9},"gauge":{"pc":{"rep":4813,"tot":5088,"pct":94.6},"sc":{"rep":4525,"tot":5088,"pct":88.9}},"grades":{"1ro":{"mat":134824,"ev":130647},"2do":{"mat":139658,"ev":136376},"3ro":{"mat":150443,"ev":146703},"4to":{"mat":146763,"ev":137984},"5to":{"mat":152568,"ev":144271},"6to":{"mat":145646,"ev":138131}},"regional":[{"reg":"01 - BARAHONA","mat":29042,"ev":26755,"pct":92.1},{"reg":"02 - SAN JUAN DE LA MAGUANA","mat":32863,"ev":31819,"pct":96.8},{"reg":"03 - AZUA","mat":48820,"ev":46170,"pct":94.6},{"reg":"04 - SAN CRISTOBAL","mat":64222,"ev":62662,"pct":97.6},{"reg":"05 - SAN PEDRO DE MACORIS","mat":59988,"ev":57546,"pct":95.9},{"reg":"06 - LA VEGA","mat":52573,"ev":51390,"pct":97.7},{"reg":"07 - SAN FRANCISCO DE MACORIS","mat":28230,"ev":27684,"pct":98.1},{"reg":"08 - SANTIAGO","mat":77776,"ev":74584,"pct":95.9},{"reg":"09 - MAO","mat":21335,"ev":20708,"pct":97.1},{"reg":"10 - SANTO DOMINGO","mat":148965,"ev":141576,"pct":95.0},{"reg":"11 - PUERTO PLATA","mat":26919,"ev":26145,"pct":97.1},{"reg":"12 - HIGUEY","mat":48192,"ev":44959,"pct":93.3},{"reg":"13 - MONTE CRISTI","mat":16849,"ev":16333,"pct":96.9},{"reg":"14 - NAGUA","mat":25342,"ev":25192,"pct":99.4},{"reg":"15 - SANTO DOMINGO","mat":118312,"ev":112075,"pct":94.7},{"reg":"16 - COTUI","mat":30187,"ev":29329,"pct":97.2},{"reg":"17 - MONTE PLATA","mat":23062,"ev":22270,"pct":96.6},{"reg":"18 - BAHORUCO","mat":17225,"ev":16915,"pct":98.2}],"drill_reg":[{"name":"01 - BARAHONA","tot":161,"pc":156,"sc":143,"ppc":96.9,"psc":88.8},{"name":"02 - SAN JUAN DE LA MAGUANA","tot":365,"pc":341,"sc":302,"ppc":93.4,"psc":82.7},{"name":"03 - AZUA","tot":318,"pc":307,"sc":305,"ppc":96.5,"psc":95.9},{"name":"04 - SAN CRISTOBAL","tot":307,"pc":297,"sc":273,"ppc":96.7,"psc":88.9},{"name":"05 - SAN PEDRO DE MACORIS","tot":340,"pc":295,"sc":277,"ppc":86.8,"psc":81.5},{"name":"06 - LA VEGA","tot":431,"pc":417,"sc":405,"ppc":96.8,"psc":94.0},{"name":"07 - SAN FRANCISCO DE MACORIS","tot":329,"pc":314,"sc":297,"ppc":95.4,"psc":90.3},{"name":"08 - SANTIAGO","tot":361,"pc":357,"sc":329,"ppc":98.9,"psc":91.1},{"name":"09 - MAO","tot":187,"pc":177,"sc":165,"ppc":94.7,"psc":88.2},{"name":"10 - SANTO DOMINGO","tot":370,"pc":348,"sc":341,"ppc":94.1,"psc":92.2},{"name":"11 - PUERTO PLATA","tot":266,"pc":254,"sc":248,"ppc":95.5,"psc":93.2},{"name":"12 - HIGUEY","tot":237,"pc":234,"sc":216,"ppc":98.7,"psc":91.1},{"name":"13 - MONTE CRISTI","tot":192,"pc":155,"sc":134,"ppc":80.7,"psc":69.8},{"name":"14 - NAGUA","tot":275,"pc":268,"sc":239,"ppc":97.5,"psc":86.9},{"name":"15 - SANTO DOMINGO","tot":288,"pc":271,"sc":266,"ppc":94.1,"psc":92.4},{"name":"16 - COTUI","tot":271,"pc":262,"sc":249,"ppc":96.7,"psc":91.9},{"name":"17 - MONTE PLATA","tot":241,"pc":236,"sc":224,"ppc":97.9,"psc":92.9},{"name":"18 - BAHORUCO","tot":149,"pc":124,"sc":112,"ppc":83.2,"psc":75.2}]}};
 
 // ── ACTIVE PERIOD & MODE ──────────────────────────────────────────────────────
-let _activePeriod = 'MAYO'; // 'MAYO' | 'SEPT' | 'NOV' | 'MAR'
-let _liveAutoRefreshTimer = null;
-
-function fmtN(n) { return Number(n).toLocaleString('es-DO'); }
+let _activePeriod = 'MAYO';
+let _liveAutoRefreshTimer = null; // kept for compatibility, never used
 
 function setPeriod(p, btn) {
   _activePeriod = p;
   document.querySelectorAll('.ptab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 
-  const isLive = (p === 'MAYO');
-  document.body.className = isLive ? 'mode-live' : 'mode-hist';
-
-  if (isLive) {
-    // Switch to live mode
-    document.getElementById('hist-info-bar').textContent = '';
-    document.getElementById('upd').textContent = '—';
-    document.getElementById('msg').style.display = 'block';
-    document.getElementById('dc').style.display  = 'none';
-    loadAll();
-    if (!_liveAutoRefreshTimer) {
-      _liveAutoRefreshTimer = setInterval(loadAll, 120000);
+  if (p === 'MAYO') {
+    if (ALL.length > 0) {
+      // Data already loaded — just re-render
+      document.getElementById('msg').style.display = 'none';
+      document.getElementById('dc').style.display  = 'block';
+      renderAll();
+    } else {
+      // First time — load once
+      document.getElementById('msg').style.display = 'block';
+      document.getElementById('dc').style.display  = 'none';
+      loadAll();
     }
   } else {
-    // Switch to historical mode – stop auto-refresh
-    if (_liveAutoRefreshTimer) { clearInterval(_liveAutoRefreshTimer); _liveAutoRefreshTimer = null; }
-    const labels = {SEPT:'Sep 2025',NOV:'Nov 2025',MAR:'Mar 2026'};
-    document.getElementById('hist-info-bar').textContent = `Período: ${labels[p]}`;
-    const hd = HIST_D[p];
-    document.getElementById('upd').textContent = `${fmtN(hd.kpis.centros)} centros reportaron · ${hd.kpis.cov}% cobertura`;
+    const labels = {SEPT:'Sep 2025', NOV:'Nov 2025', MAR:'Mar 2026'};
+    document.getElementById('upd').textContent = `Período: ${labels[p]}`;
     document.getElementById('msg').style.display = 'none';
     document.getElementById('dc').style.display  = 'block';
-    // Render historical view
     renderHistPeriod(p);
   }
 }
@@ -9257,8 +9234,7 @@ async function loadAll() {
     poblarTiposCentro();
     document.getElementById('msg').style.display = 'none';
     document.getElementById('dc').style.display  = 'block';
-    const t = new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
-    document.getElementById('upd').innerHTML = t + ' · <span style="color:#EF9F27;font-size:11px">\u26a0 Sin conexi\u00f3n a Google Sheets \u2014 reintentando en 2 min</span>';
+    document.getElementById('upd').innerHTML = '<span style="color:#EF9F27;font-size:11px">⚠ Sin conexión — datos no disponibles</span>';
     cascadeR();
     return;
   }
@@ -9269,20 +9245,17 @@ async function loadAll() {
   document.getElementById('msg').style.display = 'none';
   document.getElementById('dc').style.display  = 'block';
 
-  const t = new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
   const warnHtml = warnings.length
     ? ` · <span style="color:#EF9F27;font-size:11px">⚠ ${warnings.join('; ')}</span>`
     : '';
   document.getElementById('upd').innerHTML =
-    `${t} · 1er Ciclo: ${pc.length} registros · 2do Ciclo: ${sc.length} registros · ${ALL.filter(esSectorOK).length} total${warnHtml}`;
+    `Mayo 2026 · ${pc.length} registros 1er ciclo · ${sc.length} registros 2do ciclo${warnHtml}`;
 
   cascadeR();
 }
 
-// Start in live mode
-document.body.className = 'mode-live';
+// Load Mayo data once on startup (no auto-refresh — data is final)
 loadAll();
-_liveAutoRefreshTimer = setInterval(loadAll, 120000);
 </script>
 </body>
 </html>
