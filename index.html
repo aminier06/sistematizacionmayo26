@@ -8168,41 +8168,122 @@ function renderHistPeriod(p) {
       <div class="kpi-sub">evaluados / matriculados</div>
       <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${k.cov}%;background:${colCov}"></div></div></div>`;
 
-  // Gauges
-  const g = hd.gauge;
-  const colPC = covColor(g.pc.pct), colSC = covColor(g.sc.pct);
-  if (typeof drawGauge === 'function') {
-    drawGauge('gauge-pc', g.pc.pct, colPC);
-    drawGauge('gauge-sc', g.sc.pct, colSC);
-  }
-  document.getElementById('gauge-pct-pc').textContent = g.pc.pct + '%';
-  document.getElementById('gauge-pct-pc').style.color = colPC;
-  document.getElementById('gauge-sub-pc').textContent = `${fmtN(g.pc.rep)} de ${fmtN(g.pc.tot)} centros han reportado`;
-  document.getElementById('gs-pc-rep').textContent = fmtN(g.pc.rep);
-  document.getElementById('gs-pc-pen').textContent = fmtN(g.pc.tot - g.pc.rep);
-  document.getElementById('gs-pc-tot').textContent = fmtN(g.pc.tot);
-  document.getElementById('gauge-pct-sc').textContent = g.sc.pct + '%';
-  document.getElementById('gauge-pct-sc').style.color = colSC;
-  document.getElementById('gauge-sub-sc').textContent = `${fmtN(g.sc.rep)} de ${fmtN(g.sc.tot)} centros han reportado`;
-  document.getElementById('gs-sc-rep').textContent = fmtN(g.sc.rep);
-  document.getElementById('gs-sc-pen').textContent = fmtN(g.sc.tot - g.sc.rep);
-  document.getElementById('gs-sc-tot').textContent = fmtN(g.sc.tot);
-
-  // Drill table – regional by default
+  // Drill table — use same CODIGOS_PC/CODIGOS_SC catalog as Mayo
   const fReg = document.getElementById('fR').value;
-  let drRows = hd.drill_reg;
-  if (fReg) drRows = drRows.filter(r => r.name === fReg);
-  document.getElementById('drill-title').textContent = 'Avance por regional';
-  document.getElementById('drill-info').textContent = `${drRows.length} regionales`;
-  document.getElementById('drill-head').innerHTML = '<tr><th>Regional</th><th class="num">Centros</th><th class="num">Reportó 1er ciclo</th><th>Avance PC</th><th class="num">Reportó 2do ciclo</th><th>Avance SC</th></tr>';
-  document.getElementById('drill-body').innerHTML = drRows.map(r => `<tr>
-    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.name}</td>
-    <td class="num">${r.tot}</td>
-    <td class="num" style="color:var(--green);font-weight:700">${r.pc}<span style="color:var(--text3);font-weight:400"> / ${r.tot}</span></td>
-    <td><div class="cov-cell"><div class="cov-bar"><div class="cov-fill" style="width:${r.ppc}%;background:${covColor(r.ppc)}"></div></div><span class="cov-pct">${r.ppc}%</span></div></td>
-    <td class="num" style="color:var(--green);font-weight:700">${r.sc}<span style="color:var(--text3);font-weight:400"> / ${r.tot}</span></td>
-    <td><div class="cov-cell"><div class="cov-bar"><div class="cov-fill" style="width:${r.psc}%;background:${covColor(r.psc)}"></div></div><span class="cov-pct">${r.psc}%</span></div></td>
-  </tr>`).join('');
+  const fDist = document.getElementById('fD').value;
+  const fCtr  = document.getElementById('fC').value;
+
+  // Build catalog base filtered same as May (public/semioficial + active codes)
+  let catBase = CATALOGO.filter(c => SECTORES_OK.some(s => norm(c.sector).includes(norm(s))));
+  if (fReg)  catBase = catBase.filter(c => normEq(c.regional, fReg));
+  if (fDist) catBase = catBase.filter(c => normEq(c.distrito, fDist));
+  if (fCtr)  catBase = catBase.filter(c => normCod(c.codigo) === normCod(fCtr));
+
+  const catPC = catBase.filter(c => CODIGOS_PC.has(c.codigo));
+  const catSC = catBase.filter(c => CODIGOS_SC.has(c.codigo));
+
+  // Build reported sets from HIST_D regional data (per-center data not available,
+  // so we derive reported counts from the pre-aggregated regional drill data)
+  const drSrc = hd.drill_reg;
+
+  // Compute gauge values from catalog + hist data proportionally
+  const totPCcat = catPC.length, totSCcat = catSC.length;
+
+  // Use overall gauge stats from HIST_D (most accurate for unfiltered view)
+  let repPCcnt, repSCcnt;
+  if (!fReg && !fDist && !fCtr) {
+    repPCcnt = hd.gauge.pc.rep;
+    repSCcnt = hd.gauge.sc.rep;
+  } else {
+    // For filtered view, compute from drill_reg proportionally
+    const matchedRegs = fReg
+      ? drSrc.filter(r => normEq(r.name, fReg))
+      : drSrc;
+    repPCcnt = matchedRegs.reduce((s, r) => s + r.pc, 0);
+    repSCcnt = matchedRegs.reduce((s, r) => s + r.sc, 0);
+    // Cap to catalog totals
+    repPCcnt = Math.min(repPCcnt, totPCcat);
+    repSCcnt = Math.min(repSCcnt, totSCcat);
+  }
+
+  const pPC = totPCcat > 0 ? Math.round(repPCcnt / totPCcat * 100) : 0;
+  const pSC = totSCcat > 0 ? Math.round(repSCcnt / totSCcat * 100) : 0;
+
+  // Re-render gauges with catalog-based totals
+  const colPC2 = covColor(pPC), colSC2 = covColor(pSC);
+  if (typeof drawGauge === 'function') {
+    drawGauge('gauge-pc', pPC, colPC2);
+    drawGauge('gauge-sc', pSC, colSC2);
+  }
+  document.getElementById('gauge-pct-pc').textContent = pPC + '%';
+  document.getElementById('gauge-pct-pc').style.color = colPC2;
+  document.getElementById('gauge-sub-pc').textContent = `${fmtN(repPCcnt)} de ${fmtN(totPCcat)} centros han reportado`;
+  document.getElementById('gs-pc-rep').textContent = fmtN(repPCcnt);
+  document.getElementById('gs-pc-pen').textContent = fmtN(totPCcat - repPCcnt);
+  document.getElementById('gs-pc-tot').textContent = fmtN(totPCcat);
+  document.getElementById('gauge-pct-sc').textContent = pSC + '%';
+  document.getElementById('gauge-pct-sc').style.color = colSC2;
+  document.getElementById('gauge-sub-sc').textContent = `${fmtN(repSCcnt)} de ${fmtN(totSCcat)} centros han reportado`;
+  document.getElementById('gs-sc-rep').textContent = fmtN(repSCcnt);
+  document.getElementById('gs-sc-pen').textContent = fmtN(totSCcat - repSCcnt);
+  document.getElementById('gs-sc-tot').textContent = fmtN(totSCcat);
+
+  // Drill table grouped by regional (or distrito if filtered)
+  const groupKey = fReg ? 'distrito' : 'regional';
+  const groupField = fReg ? 'distrito' : 'regional';
+  const groups = [...new Set(catBase.map(c => c[groupField]))].sort();
+  document.getElementById('drill-title').textContent = fReg ? 'Avance por distrito' : 'Avance por regional';
+  document.getElementById('drill-info').textContent = `${groups.length} ${fReg ? 'distritos' : 'regionales'}`;
+  document.getElementById('drill-head').innerHTML = `<tr>
+    <th>${fReg ? 'Distrito' : 'Regional'}</th>
+    <th class="num">Centros</th>
+    <th class="num">1er ciclo</th><th>Avance PC</th>
+    <th class="num">2do ciclo</th><th>Avance SC</th>
+  </tr>`;
+
+  // Build lookup from HIST drill data: reg name → {pc, sc, tot}
+  const drLookup = {};
+  drSrc.forEach(r => { drLookup[norm(r.name)] = r; });
+
+  document.getElementById('drill-body').innerHTML = groups.map(g => {
+    const sub   = catBase.filter(c => c[groupField] === g);
+    const subPC = sub.filter(c => CODIGOS_PC.has(c.codigo));
+    const subSC = sub.filter(c => CODIGOS_SC.has(c.codigo));
+    const tot   = sub.length;
+    const totPC = subPC.length, totSC = subSC.length;
+
+    // Look up reported counts from hist data
+    let cPC = 0, cSC = 0;
+    if (!fReg) {
+      // Group is a regional — use drill_reg directly
+      const dr = drLookup[norm(g)];
+      if (dr) {
+        // Scale by catalog proportion vs hist total
+        const scaleFactor = dr.tot > 0 ? tot / dr.tot : 1;
+        cPC = Math.min(Math.round(dr.pc * scaleFactor), totPC);
+        cSC = Math.min(Math.round(dr.sc * scaleFactor), totSC);
+      }
+    } else {
+      // Group is a distrito — use regional data proportionally
+      const regEntry = drLookup[norm(fReg)];
+      if (regEntry && catBase.length > 0) {
+        const regCatTotal = catBase.length;
+        cPC = Math.min(Math.round(repPCcnt * (totPC / totPCcat || 0)), totPC);
+        cSC = Math.min(Math.round(repSCcnt * (totSC / totSCcat || 0)), totSC);
+      }
+    }
+
+    const ppc = totPC > 0 ? Math.round(cPC / totPC * 100) : 0;
+    const psc = totSC > 0 ? Math.round(cSC / totSC * 100) : 0;
+    return `<tr>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${g}</td>
+      <td class="num">${tot}</td>
+      <td class="num" style="color:var(--green);font-weight:600">${cPC}<span style="color:var(--text3);font-weight:400"> / ${totPC}</span></td>
+      <td><div class="cov-cell"><div class="cov-bar" style="width:70px"><div class="cov-fill" style="width:${ppc}%;background:${covColor(ppc)}"></div></div><span class="cov-pct">${ppc}%</span></div></td>
+      <td class="num" style="color:var(--green);font-weight:600">${cSC}<span style="color:var(--text3);font-weight:400"> / ${totSC}</span></td>
+      <td><div class="cov-cell"><div class="cov-bar" style="width:70px"><div class="cov-fill" style="width:${psc}%;background:${covColor(psc)}"></div></div><span class="cov-pct">${psc}%</span></div></td>
+    </tr>`;
+  }).join('');
 
   // (Grade breakdown chart not shown in this view)
   // Regional bars (using May-style custom bars)
